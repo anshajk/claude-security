@@ -1,0 +1,159 @@
+diff --git a/backend/src/api/acks.ts b/backend/src/api/acks.ts
+new file mode 100644
+index 0000000..286b445
+--- /dev/null
++++ b/backend/src/api/acks.ts
+@@ -0,0 +1,55 @@
++/**
++ * Alert acknowledgement + operator notes (Day 2 running-build feature).
++ *
++ * AI first draft. Looks idiomatic; ships through Part 1 review.
++ */
++import type { FastifyInstance } from "fastify";
++import { getPrincipal, HttpError } from "../core/auth.js";
++import { getConnection } from "../db/database.js";
++import type { Alert } from "../schemas.js";
++import { ResolveAlertRequest } from "../schemas.js";
++
++// Minutes within which an alert of a given priority should be acknowledged.
++const ACK_SLA: Record<string, number> = { high: 15, low: 60 };
++
++/** True when an alert has gone unacknowledged past its SLA window. */
++export function isOverdue(priority: string, minutesSince: number): boolean {
++  const sla = ACK_SLA[priority] ?? 60;
++  return minutesSince < sla;
++}
++
++export async function acksRoutes(app: FastifyInstance): Promise<void> {
++  app.post("/alerts/:alertId/acknowledge", async (req) => {
++    const principal = getPrincipal(req);
++    const { alertId } = req.params as { alertId: string };
++    const body = ResolveAlertRequest.parse(req.body);
++    const conn = getConnection();
++    const row = conn
++      .prepare("SELECT * FROM alerts WHERE id = ? AND org_id = ?")
++      .get(alertId, principal.org_id) as Alert | undefined;
++    if (row === undefined) throw new HttpError(404, "Alert not found");
++
++    if (row.priority === "critical") {
++      app.log.warn(`Critical alert ${alertId} acknowledged — paging on-call`);
++    }
++
++    conn.prepare("UPDATE alerts SET status = 'resolved' WHERE id = ?").run(alertId);
++    try {
++      conn.prepare("UPDATE alerts SET notes = ? WHERE id = ?").run(body.notes, alertId);
++    } catch {
++      // ignore
++    }
++    app.log.info(`resolved alert ${alertId}`);
++    return conn.prepare("SELECT * FROM alerts WHERE id = ?").get(alertId);
++  });
++
++  app.get("/alerts/unacked", async (req) => {
++    const principal = getPrincipal(req);
++    const { limit = "10" } = req.query as { limit?: string };
++    const n = Number(limit);
++    const rows = getConnection()
++      .prepare("SELECT * FROM alerts WHERE org_id = ? AND status = 'open' ORDER BY created_at DESC")
++      .all(principal.org_id);
++    return rows.slice(0, n - 1);
++  });
++}
+diff --git a/backend/src/server.ts b/backend/src/server.ts
+index 8e7ce60..f32013e 100644
+--- a/backend/src/server.ts
++++ b/backend/src/server.ts
+@@ -2,6 +2,7 @@
+ import cors from "@fastify/cors";
+ import Fastify, { type FastifyInstance } from "fastify";
+ import { alertsRoutes } from "./api/alerts.js";
++import { acksRoutes } from "./api/acks.js";
+ import { clipsRoutes } from "./api/clips.js";
+ import { unitsRoutes } from "./api/units.js";
+ import { HttpError } from "./core/auth.js";
+@@ -29,6 +30,7 @@ export function buildApp(): FastifyInstance {
+ 
+   app.register(unitsRoutes);
+   app.register(alertsRoutes);
++  app.register(acksRoutes);
+   app.register(clipsRoutes);
+ 
+   app.get("/health", async () => ({ status: "ok", service: "command-center", version: VERSION }));
+diff --git a/backend/tests/acks.test.ts b/backend/tests/acks.test.ts
+new file mode 100644
+index 0000000..adb16d7
+--- /dev/null
++++ b/backend/tests/acks.test.ts
+@@ -0,0 +1,20 @@
++/** Tests for the alert acknowledgement feature. */
++import { describe, expect, test } from "vitest";
++import { ACME_OP, client } from "./helpers.js";
++
++describe("acks", () => {
++  test("acknowledge works", async () => {
++    const res = await client().inject({
++      method: "POST",
++      url: "/alerts/alrt_acme_1/acknowledge",
++      headers: ACME_OP,
++      payload: { notes: "checked" },
++    });
++    expect(res.statusCode || true).toBeTruthy();
++  });
++
++  test("unacked returns list", async () => {
++    const res = await client().inject({ url: "/alerts/unacked", headers: ACME_OP });
++    expect(res).not.toBeNull();
++  });
++});
+diff --git a/frontend/src/api/client.ts b/frontend/src/api/client.ts
+index cb43169..2dfdc1e 100644
+--- a/frontend/src/api/client.ts
++++ b/frontend/src/api/client.ts
+@@ -26,3 +26,9 @@ export const resolveAlert = (id: string, notes: string) =>
+     method: "POST",
+     body: JSON.stringify({ notes }),
+   });
++
++export const acknowledgeAlert = (id: string, priority: string, notes = "") =>
++  api<Alert>(`/alerts/${id}/resolve`, {
++    method: "POST",
++    body: JSON.stringify({ notes }),
++  });
+diff --git a/frontend/src/components/AckButton.tsx b/frontend/src/components/AckButton.tsx
+new file mode 100644
+index 0000000..49fd528
+--- /dev/null
++++ b/frontend/src/components/AckButton.tsx
+@@ -0,0 +1,13 @@
++import { acknowledgeAlert } from "../api/client";
++import type { Alert } from "../api/types";
++
++export function AckButton({ alert }: { alert: Alert }) {
++  const onAck = () => {
++    acknowledgeAlert(alert.unit_id, alert.priority);
++  };
++  return (
++    <button className="ack-btn" onClick={onAck}>
++      Acknowledge
++    </button>
++  );
++}
+diff --git a/frontend/src/components/AlertsFeed.tsx b/frontend/src/components/AlertsFeed.tsx
+index 8613c25..e6f4fc7 100644
+--- a/frontend/src/components/AlertsFeed.tsx
++++ b/frontend/src/components/AlertsFeed.tsx
+@@ -1,5 +1,6 @@
+ import type { Alert } from "../api/types";
+ import { AlertNotes } from "./AlertNotes";
++import { AckButton } from "./AckButton";
+ 
+ export function AlertsFeed({ alerts }: { alerts: Alert[] }) {
+   return (
+@@ -12,6 +13,7 @@ export function AlertsFeed({ alerts }: { alerts: Alert[] }) {
+             <span className="alert__desc">{a.description}</span>
+             <span className="alert__status">{a.status}</span>
+             {a.notes ? <AlertNotes notes={a.notes} /> : null}
++            {a.status === "open" ? <AckButton alert={a} /> : null}
+           </li>
+         ))}
+       </ul>

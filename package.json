@@ -1,0 +1,16 @@
+{
+  "name": "trust-gate-bootcamp",
+  "private": true,
+  "description": "Day 3 'Trust Gate' bootcamp monorepo (LVT Command Center). TypeScript backend + frontend.",
+  "scripts": {
+    "dev:api": "pnpm --filter command-center-api dev",
+    "dev:web": "pnpm --filter command-center-dashboard dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "biome check ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

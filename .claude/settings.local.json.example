@@ -1,0 +1,9 @@
+{
+  "_comment": "EXAMPLE of a per-engineer local override. Copy to .claude/settings.local.json (gitignored) and edit. Local settings MERGE on top of the committed project settings; use them for personal conveniences that should NOT be a team standard. Never commit secrets here.",
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)"
+    ]
+  }
+}

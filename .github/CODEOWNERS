@@ -1,0 +1,18 @@
+# CODEOWNERS — the human gate behind the automated ones.
+# Security-relevant surfaces require a second pair of (human) eyes before merge, regardless of how
+# clean an AI-written diff looks. Pair this with branch protection: "require review from Code Owners".
+#
+# VERIFY: replace the placeholder teams/usernames with your real ones before using on a live repo.
+
+# Default owner for everything
+*                               @lvt/command-center-maintainers
+
+# Auth, multi-tenant scoping, and data access — highest-blast-radius code
+/backend/src/core/              @lvt/security
+/backend/src/api/clips.ts       @lvt/security
+/backend/src/api/units.ts       @lvt/security
+/backend/src/db/                @lvt/security
+
+# Anything that changes the agent's permissions, hooks, skills, or CI is a security decision
+/.claude/                       @lvt/security
+/.github/                       @lvt/security

@@ -1,0 +1,12 @@
+# Node / pnpm / Vite
+node_modules/
+frontend/dist/
+frontend/node_modules/.vite/
+*.tsbuildinfo
+
+# Claude Code local overrides (never commit per-engineer secrets/permissions)
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+*.log

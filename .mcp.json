@@ -1,0 +1,10 @@
+{
+  "_comment": "VERIFY: .mcp.json shape (mcpServers map, command/args/env keys) against your installed Claude Code version. This file is committed so the team shares the same MCP servers; secrets must come from the environment, never inline. Example below is a read-only docs server — adjust or remove for your session. The marketplace-as-attack-surface rule (Part 3) applies to MCP servers too: an MCP server runs with the agent's privileges, so vet it like any dependency.",
+  "mcpServers": {
+    "docs": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./docs"],
+      "env": {}
+    }
+  }
+}

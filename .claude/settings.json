@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "VERIFY against your installed Claude Code version: (1) permission rule string syntax e.g. Bash(cmd:*), Read(path), WebFetch(domain:host); (2) the permissions.ask key name (older builds used a different name); (3) defaultMode / Auto mode naming; (4) the hooks event names and command schema. Project settings MERGE with user + local scopes (they do not override). Commit this file; never commit .claude/settings.local.json.",
+
+  "permissions": {
+    "defaultMode": "default",
+
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(make:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm -r test:*)",
+      "Bash(pnpm -r build:*)",
+      "Bash(pnpm --filter command-center-api test:*)",
+      "Bash(pnpm --filter command-center-dashboard test:*)",
+      "Bash(pnpm --filter command-center-dashboard build:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl http://localhost:*)"
+    ],
+
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "WebFetch",
+      "Edit(.claude/**)",
+      "Edit(.github/**)",
+      "Write(.claude/**)"
+    ],
+
+    "deny": [
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/secrets/**)",
+      "Bash(curl http://169.254.169.254/**)",
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/secret-scan.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

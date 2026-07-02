@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "EXAMPLE managed policy — the version IT/DevOps would push to every machine (via MDM / a managed settings path), not a file engineers edit. Managed settings sit ABOVE user, project, and local scopes and CANNOT be overridden by them. VERIFY every key below against your installed Claude Code version before shipping: (1) the managed settings file location; (2) exact key names for locking modes and marketplaces; (3) permission-rule string syntax. Deny rules from all scopes merge, so the org deny list here always applies on top of each repo's own.",
+
+  "permissions": {
+    "_comment_rules": "Org-wide floor. These deny rules are added to whatever each project already denies — they cannot be removed by a project or a local file.",
+    "deny": [
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/secrets/**)",
+      "Bash(curl http://169.254.169.254/**)",
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "mcp__*"
+    ],
+    "_comment_modes": "Take the dangerous escape hatches off the table for the whole fleet. bypassPermissions skips every prompt; auto mode hands the safety decision to a background classifier. The value is the string \"disable\", and these keys live under permissions.",
+    "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable"
+  },
+
+  "_comment_rules_ownership": "Left OFF on purpose: allowManagedPermissionRulesOnly would forbid teams from defining ANY allow/ask/deny of their own. We want teams to still own their project settings.json — the managed deny list above merges on top regardless.",
+  "allowManagedPermissionRulesOnly": false,
+
+  "_comment_supply_chain": "Contain the skills/MCP attack surface (the AST10 lesson). Only hooks shipped in managed settings run; plugin marketplaces are blocked; sideload flags are rejected so nobody can point Claude Code at an unvetted source from the CLI.",
+  "allowManagedHooksOnly": true,
+  "blockedMarketplaces": ["*"],
+  "disableSideloadFlags": true
+}

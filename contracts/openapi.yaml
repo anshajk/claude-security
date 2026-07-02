@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: LVT Command Center API (bootcamp)
+  version: 0.1.0
+  description: >
+    The INTENDED contract for the Command Center API. This is the only artifact the black-box
+    review hat (Part 2) is allowed to see — it must not read the implementation. Where the running
+    code disagrees with the promises below, that gap is a finding.
+
+    Security model (promised): every endpoint requires `Authorization: Bearer <token>`, and every
+    resource is scoped to the caller's org. A caller MUST NOT be able to read or act on another
+    org's units, alerts, or clips. High-impact physical actions require an authenticated operator
+    or admin and are never silent.
+servers:
+  - url: http://localhost:8000
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200": { description: Service is up }
+
+  /units:
+    get:
+      summary: List units for the caller's org
+      parameters:
+        - { name: site, in: query, required: false, schema: { type: string } }
+        - name: sort
+          in: query
+          required: false
+          description: Sort column. Only `label`, `battery_pct`, `status` are accepted.
+          schema: { type: string, enum: [label, battery_pct, status] }
+      responses:
+        "200":
+          description: Units belonging to the caller's org only
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Unit" } }
+        "401": { description: Missing/invalid token }
+
+  /units/{unit_id}:
+    get:
+      summary: Get a single unit (must belong to the caller's org)
+      parameters: [{ name: unit_id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Unit, content: { application/json: { schema: { $ref: "#/components/schemas/Unit" } } } }
+        "404": { description: Not found OR not in the caller's org (do not distinguish) }
+
+  /units/{unit_id}/health:
+    get:
+      summary: Battery/solar/signal telemetry for a unit in the caller's org
+      parameters: [{ name: unit_id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Telemetry, content: { application/json: { schema: { $ref: "#/components/schemas/UnitHealth" } } } }
+        "404": { description: Not found / not in org }
+
+  /units/{unit_id}/callback:
+    post:
+      summary: Register a snapshot/health webhook the Command Center will probe
+      description: >
+        The supplied URL is probed server-side. The contract promises the server only contacts
+        approved external webhook destinations and never internal/loopback/metadata addresses.
+      parameters: [{ name: unit_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CallbackRequest" }
+      responses:
+        "200": { description: Callback registered, content: { application/json: { schema: { $ref: "#/components/schemas/CallbackResponse" } } } }
+        "400": { description: URL rejected by the destination allowlist }
+        "404": { description: Not found / not in org }
+
+  /units/{unit_id}/deterrent:
+    post:
+      summary: Activate a physical deterrent (light/strobe/audio) on a deployed unit
+      description: High-impact action. Requires operator or admin in the unit's org.
+      parameters: [{ name: unit_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeterrentRequest" }
+      responses:
+        "200": { description: Activated, content: { application/json: { schema: { $ref: "#/components/schemas/DeterrentResponse" } } } }
+        "400": { description: Unknown deterrent kind }
+        "403": { description: Caller lacks the required role }
+        "404": { description: Not found / not in org }
+
+  /alerts:
+    get:
+      summary: List alerts for the caller's org
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, resolved] } }
+      responses:
+        "200": { description: Alerts (org-scoped), content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Alert" } } } } }
+
+  /alerts/search:
+    get:
+      summary: Free-text search across the caller's alerts
+      description: >
+        Matches `q` against alert description and notes. The contract promises results are limited
+        to the caller's org and that `q` is treated strictly as data (no query-language injection).
+      parameters: [{ name: q, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Matching alerts (org-scoped), content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Alert" } } } } }
+
+  /alerts/{alert_id}/resolve:
+    post:
+      summary: Resolve an alert with operator notes
+      description: >
+        Notes are stored as-is and rendered later in the dashboard. The contract promises notes are
+        treated as untrusted text and never executed in any client.
+      parameters: [{ name: alert_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolveAlertRequest" }
+      responses:
+        "200": { description: Updated alert, content: { application/json: { schema: { $ref: "#/components/schemas/Alert" } } } }
+        "404": { description: Not found / not in org }
+
+  /clips/{clip_id}:
+    get:
+      summary: Get recorded-footage metadata
+      description: >
+        IMPORTANT CONTRACT PROMISE — a clip is only returned if it belongs to the caller's org.
+        A caller requesting another org's clip MUST receive 404, never that clip's data.
+      parameters: [{ name: clip_id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Clip metadata (org-scoped), content: { application/json: { schema: { $ref: "#/components/schemas/Clip" } } } }
+        "404": { description: Not found OR belongs to another org }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    Unit:
+      type: object
+      required: [id, org_id, site_id, label, status, battery_pct, signal_dbm]
+      properties:
+        id: { type: string }
+        org_id: { type: string }
+        site_id: { type: string }
+        label: { type: string }
+        status: { type: string, enum: [online, offline] }
+        battery_pct: { type: integer }
+        signal_dbm: { type: integer }
+    UnitHealth:
+      type: object
+      properties:
+        unit_id: { type: string }
+        status: { type: string }
+        battery_pct: { type: integer }
+        signal_dbm: { type: integer }
+    Alert:
+      type: object
+      required: [id, org_id, unit_id, priority, status, description, notes, created_at]
+      properties:
+        id: { type: string }
+        org_id: { type: string }
+        unit_id: { type: string }
+        priority: { type: string, enum: [high, low] }
+        status: { type: string, enum: [open, resolved] }
+        description: { type: string }
+        notes: { type: string }
+        created_at: { type: string, format: date-time }
+    Clip:
+      type: object
+      required: [id, org_id, unit_id, recorded_at, storage_url]
+      properties:
+        id: { type: string }
+        org_id: { type: string }
+        unit_id: { type: string }
+        recorded_at: { type: string, format: date-time }
+        storage_url: { type: string }
+    CallbackRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri }
+    CallbackResponse:
+      type: object
+      properties:
+        unit_id: { type: string }
+        url: { type: string }
+        reachable: { type: boolean }
+    DeterrentRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [light, strobe, audio] }
+    DeterrentResponse:
+      type: object
+      properties:
+        unit_id: { type: string }
+        kind: { type: string }
+        activated: { type: boolean }
+    ResolveAlertRequest:
+      type: object
+      properties:
+        notes: { type: string, maxLength: 2000 }

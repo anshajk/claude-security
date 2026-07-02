@@ -1,0 +1,44 @@
+name: trust-gate-ci
+# The deterministic PR gate. Day 3 teaches review/security/permissions as habits; this wires the
+# non-negotiable ones into CI so they run on every PR, not just when someone remembers.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Lint + format check (biome)
+        run: pnpm lint
+      - name: Type-check + build
+        run: pnpm -r build
+      - name: Tests (vitest)
+        run: pnpm -r test
+
+  # Secret scan as a CI backstop to the local PreToolUse hook (defense in depth).
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# VERIFY: pin action versions to your org's approved list. The clips-IDOR cross-tenant test
+# (labs/part2-multi-hat) is the kind of assertion that should live in the backend tests so the gate
+# fails until the bug is fixed.
