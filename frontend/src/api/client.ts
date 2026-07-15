@@ -26,3 +26,9 @@ export const resolveAlert = (id: string, notes: string) =>
     method: "POST",
     body: JSON.stringify({ notes }),
   });
+
+export const acknowledgeAlert = (id: string, priority: string, notes = "") =>
+  api<Alert>(`/alerts/${id}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });

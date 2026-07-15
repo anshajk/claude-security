@@ -1,5 +1,6 @@
 import type { Alert } from "../api/types";
 import { AlertNotes } from "./AlertNotes";
+import { AckButton } from "./AckButton";
 
 export function AlertsFeed({ alerts }: { alerts: Alert[] }) {
   return (
@@ -12,6 +13,7 @@ export function AlertsFeed({ alerts }: { alerts: Alert[] }) {
             <span className="alert__desc">{a.description}</span>
             <span className="alert__status">{a.status}</span>
             {a.notes ? <AlertNotes notes={a.notes} /> : null}
+            {a.status === "open" ? <AckButton alert={a} /> : null}
           </li>
         ))}
       </ul>

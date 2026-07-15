@@ -2,6 +2,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { alertsRoutes } from "./api/alerts.js";
+import { acksRoutes } from "./api/acks.js";
 import { clipsRoutes } from "./api/clips.js";
 import { unitsRoutes } from "./api/units.js";
 import { HttpError } from "./core/auth.js";
@@ -29,6 +30,7 @@ export function buildApp(): FastifyInstance {
 
   app.register(unitsRoutes);
   app.register(alertsRoutes);
+  app.register(acksRoutes);
   app.register(clipsRoutes);
 
   app.get("/health", async () => ({ status: "ok", service: "command-center", version: VERSION }));
