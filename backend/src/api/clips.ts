@@ -12,3 +12,5 @@ export async function clipsRoutes(app: FastifyInstance): Promise<void> {
     return row;
   });
 }
+
+// demo: trivial touch to trigger the part3-security workflow (no behavior change)
