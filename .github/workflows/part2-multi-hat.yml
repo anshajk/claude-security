@@ -60,6 +60,7 @@ jobs:
             chat message. If you find nothing, say so plainly; do not invent issues to fill the hat.
           claude_args: |
             --max-turns 20
+            --model sonnet
             --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
 
   # Black-box hat — contract-vs-behavior. Boots the real API, then reviews it against the OpenAPI
@@ -118,4 +119,5 @@ jobs:
             via `gh pr comment`. Only post GitHub comments — do not return the review as a chat message.
           claude_args: |
             --max-turns 25
-            --allowedTools "Read(contracts/openapi.yaml),Bash(curl http://localhost:*),Bash(gh pr comment:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
+            --model sonnet
+            --allowedTools "Read(contracts/openapi.yaml),Bash(curl:*),Bash(gh pr comment:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
