@@ -119,18 +119,24 @@ jobs:
             curl using the seed tokens (e.g. `acme-operator-token`, `globex-operator-token`) and report
             where observed behavior contradicts the contract.
 
+            Budget discipline: you have a limited number of turns. Probe the HIGHEST-IMPACT contract
+            promises first — cross-org clip access (IDOR), callback SSRF/allowlist, deterrent
+            authz/role, and cross-org units/alerts isolation — then STOP probing and post. Do not
+            exhaustively test every endpoint or variant; a focused report on the critical findings beats
+            an unfinished exhaustive one.
+
             You MUST actually execute curl against http://localhost:8000 (do not just describe requests),
             and you MUST end by posting exactly one comment via
-            `gh pr comment ${{ github.event.pull_request.number }} --body "<your findings>"`. Do not end
-            your turn until that command has succeeded. Only post GitHub comments — do not return the
-            review as a chat message.
+            `gh pr comment ${{ github.event.pull_request.number }} --body "<your findings>"` well before
+            you run out of turns. Do not end your turn until that command has succeeded. Only post
+            GitHub comments — do not return the review as a chat message.
           # bypassPermissions is scoped to THIS job only. The project .claude/settings.json marks
           # `Bash(curl:*)` as "ask", which outranks its `Bash(curl http://localhost:*)` allow rule, so
           # in headless CI every probe is denied. --allowedTools below still constrains the hat to
           # read-only contract access + curl + gh, so the blast radius stays tight on the ephemeral
           # runner (localhost target only).
           claude_args: |
-            --max-turns 40
+            --max-turns 60
             --model sonnet
             --permission-mode bypassPermissions
             --allowedTools "Read(contracts/openapi.yaml),Bash(curl:*),Bash(gh pr comment:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
